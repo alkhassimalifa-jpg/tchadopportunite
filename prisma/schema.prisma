@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Role {
+  CLIENT
+  PROVIDER
+  COMPANY
+  ADMIN
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+  EXPIRED
+}
+
+enum JobType {
+  CDI
+  CDD
+  FREELANCE
+  STAGE
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  ACCEPTED
+  REJECTED
+}
+
+enum Language {
+  FR
+  EN
+  AR
+}
+
+model User {
+  id                String    @id @default(uuid())
+  firebaseUid       String    @unique
+  email             String    @unique
+  firstName         String
+  lastName          String
+  phone             String?
+  photoUrl          String?
+  role              Role      @default(CLIENT)
+  isVerified        Boolean   @default(false)
+  isPremium         Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  preferredLanguage Language  @default(FR)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  profile           Profile?
+  jobsPosted        Job[]
+  applications      Application[]
+  reviewsGiven      Review[]  @relation("ReviewGiver")
+  reviewsReceived   Review[]  @relation("ReviewReceiver")
+  sentMessages      Message[] @relation("MessageSender")
+  receivedMessages  Message[] @relation("MessageReceiver")
+  notifications     Notification[]
+  favorites         Favorite[]
+
+  @@map("users")
+}
+
+model Profile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  bio          String?
+  skills       String[]
+  city         String?
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  availability Boolean  @default(true)
+  hourlyRate   Float?
+  category     String?
+  experience   Int?
+  website      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Job {
+  id                String      @id @default(uuid())
+  title             String
+  description       String
+  companyName       String
+  companyLogo       String?
+  location          String
+  salary            String?
+  type              JobType     @default(CDI)
+  category          String
+  status            JobStatus   @default(OPEN)
+  isSponsored       Boolean     @default(false)
+  applicationsCount Int         @default(0)
+  authorId          String
+  expiresAt         DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  author            User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  applications      Application[]
+
+  @@map("jobs")
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  jobId       String
+  applicantId String
+  coverLetter String?
+  cvUrl       String?
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applicant   User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, applicantId])
+  @@map("applications")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  giverId    String
+  receiverId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  giver      User     @relation("ReviewGiver", fields: [giverId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReviewReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([giverId, receiverId])
+  @@map("reviews")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      String
+  isRead    Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String
+  targetId   String   // ID of the job, provider, or company being favorited
+  targetType String   // "JOB", "PROVIDER", "COMPANY"
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId, targetType])
+  @@map("favorites")
+}
